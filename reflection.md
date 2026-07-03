@@ -10,10 +10,25 @@
 core actions: add a pet, schedule a walk, see today's tasks (from ex)
 3 additional core actions: schedule grooming appointments, store medications list, enter schedule constraints (like work hours, etc)
 
+I included 4 main classes: Owner, Pet, Task, and Scheduler.
+
+The Owner class is essentially the user themself. It includes their name, a list of their pets, their available time, and their preferences when it comes to caring for their pet. The methods for this class include changing these attributes and they control setting the preferences on how they'd like the schedule to be created. They can also add or remove their pets, of course.
+
+The Pet class is for the pets. It includes name and species/breed attributes. There are methods for adding and removing tasks in this class so tasks are linked to the pets, which will help for owners with several pets.
+
+The Task class is for the tasks the owner would like to schedule to care for their pet. The attributes of this class includes name, duration, priority, category, recurrence, and scheduled time for when they are scheduled by the app. Methods include getters for the priority and a string representation of the task object.
+
+The Scheduler class does the main work of the app. It includes references to the pet the schedule is for, the owner, and a plan (list of Tasks). The methods sort tasks by their priority, generate a schedule, and explain the reasoning as well as provide the time duration of the full schedule.
+
+
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Yes. Claude brought up a good point in that the scheduler could not easily adjust if an owner had multiple pets, so I made changes (with its help) to account for that and make sure the scheduler takes into account all tasks planned for all pets at the same time (so they all can fit into the owner's available time)
+
 
 ---
 
