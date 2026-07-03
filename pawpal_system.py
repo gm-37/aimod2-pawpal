@@ -133,6 +133,7 @@ class Scheduler:
         self.owner = owner
         self.plan: list[Task] = []
         self.skipped: list[Task] = []
+        self.plan_date: date | None = None
 
     def collect_tasks(self) -> list[Task]:
         """Every task across every pet the owner has (each knows its pet)."""
@@ -163,6 +164,7 @@ class Scheduler:
 
         self.plan = []
         self.skipped = []
+        self.plan_date = today
 
         for task in self.sort_tasks(today):
             if task.duration <= budget:
@@ -204,3 +206,29 @@ class Scheduler:
     def total_planned_time(self) -> int:
         """Pure: total minutes consumed by the scheduled tasks."""
         return sum(task.duration for task in self.plan)
+
+    def __str__(self) -> str:
+        """Readable daily plan, so print(scheduler) always looks clean."""
+        header = f"Daily plan for {self.owner.name}"
+        if self.plan_date is not None:
+            header += f" — {self.plan_date:%A, %b %d}"
+
+        lines = [header, "=" * 44]
+        if self.plan:
+            for task in self.plan:
+                lines.append(f"  {task.format_line()}")
+        else:
+            lines.append("  (nothing scheduled)")
+
+        if self.skipped:
+            lines.append("")
+            lines.append("  Skipped (ran out of time):")
+            for task in self.skipped:
+                lines.append(f"    - {task.name} ({task.duration} min)")
+
+        lines.append("-" * 44)
+        lines.append(
+            f"  Total planned: {self.total_planned_time()} min "
+            f"of {self.owner.total_available_time()} min available"
+        )
+        return "\n".join(lines)
