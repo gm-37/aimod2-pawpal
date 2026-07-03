@@ -1,15 +1,54 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
-    %% Keep this file updated so it matches your final implementation.
+    %% PawPal+ — daily pet care planner
+    %% Owner has Pet(s); Pet owns its care Tasks; Scheduler builds a daily plan.
 
-    class ClassName {
-        +type attribute
-        +method() returnType
+    class Owner {
+        +str name
+        +int available_minutes
+        +time day_start
+        +time day_end
+        +dict preferences
+        +total_available_time() int
+        +add_preference(key, value) None
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Pet {
+        +str name
+        +str species
+        +str breed
+        +int age
+        +list~Task~ tasks
+        +add_task(task) None
+        +remove_task(task) None
+        +list_tasks() list~Task~
     }
 
-    ClassName --> AnotherClass : relationship
+    class Task {
+        +str name
+        +int duration
+        +str priority
+        +str category
+        +str recurrence
+        +time scheduled_time
+        +priority_rank() int
+        +is_due_today(date) bool
+        +__repr__() str
+    }
+
+    class Scheduler {
+        +Owner owner
+        +Pet pet
+        +list~Task~ plan
+        +list~Task~ skipped
+        +sort_tasks() list~Task~
+        +generate_plan() list~Task~
+        +resolve_conflicts() None
+        +explain() str
+        +total_planned_time() int
+    }
+
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" Task : has
+    Scheduler --> Owner : uses
+    Scheduler --> Pet : plans for
+    Scheduler ..> Task : schedules
