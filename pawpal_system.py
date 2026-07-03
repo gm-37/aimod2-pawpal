@@ -51,11 +51,19 @@ class Task:
 
     def is_due_today(self, today: date) -> bool:
         """Whether this task should run on the given date (handles recurrence)."""
-        raise NotImplementedError
+        recurrence = self.recurrence.lower()
+        if recurrence == "daily":
+            return True
+        if recurrence == "weekly":
+            # Without a specific anchor date, assume weekly tasks recur on Mondays.
+            return today.weekday() == 0
+        return False
 
     def format_line(self) -> str:
         """Render one plan line, e.g. '08:00 - Biscuit: Morning walk (30 min) [high]'."""
-        raise NotImplementedError
+        time_label = self.scheduled_time.strftime("%H:%M") if self.scheduled_time else "unscheduled"
+        pet_name = self.pet.name if self.pet else "Unknown"
+        return f"{time_label} - {pet_name}: {self.name} ({self.duration} min) [{self.priority}]"
 
 
 @dataclass
@@ -113,7 +121,8 @@ class Owner:
         return min(self.available_minutes, window)
 
     def add_preference(self, key: str, value) -> None:
-        """Record an owner preference (e.g. 'no meds after 8pm')."""
+        """Record an owner preference (e.g. 'no meds after 8pm'). Key is a string description; 
+        value can be any type, describing any additional details."""
         self.preferences[key] = value
 
 
@@ -131,7 +140,11 @@ class Scheduler:
 
     def sort_tasks(self, today: date) -> list[Task]:
         """Pure: today's due tasks ordered by priority, then duration."""
-        raise NotImplementedError
+        tasks_due = [task for task in self.collect_tasks() if task.is_due_today(today)]
+        return sorted(
+            tasks_due,
+            key=lambda task: (task.priority_rank(), task.duration, task.name.lower()),
+        )
 
     def generate_plan(self, today: date) -> list[Task]:
         """The one mutator: fit tasks into the budget, resolving overlaps as we go.
@@ -139,11 +152,54 @@ class Scheduler:
         Sets self.plan and self.skipped and assigns each planned task's
         scheduled_time. Returns self.plan.
         """
-        raise NotImplementedError
+        all_tasks = self.collect_tasks()
+        for task in all_tasks:
+            task.scheduled_time = None
+
+        available_minutes = self.owner.total_available_time()
+        current_minutes = time_to_minutes(self.owner.day_start)
+        end_minutes = time_to_minutes(self.owner.day_end)
+        budget = min(available_minutes, end_minutes - current_minutes)
+
+        self.plan = []
+        self.skipped = []
+
+        for task in self.sort_tasks(today):
+            if task.duration <= budget:
+                task.scheduled_time = minutes_to_time(current_minutes)
+                self.plan.append(task)
+                current_minutes += task.duration
+                budget -= task.duration
+            else:
+                self.skipped.append(task)
+
+        return self.plan
 
     def explain(self) -> str:
         """Pure: human-readable reasoning for the current plan."""
-        raise NotImplementedError
+        if not self.plan and not self.skipped:
+            return "No plan has been generated yet."
+
+        lines = []
+        total_minutes = self.total_planned_time()
+        if self.plan:
+            lines.append(
+                f"Planned {len(self.plan)} task(s) totaling {total_minutes} minute(s):"
+            )
+            for task in self.plan:
+                lines.append(f"  - {task.format_line()}")
+        else:
+            lines.append("No tasks were scheduled.")
+
+        if self.skipped:
+            lines.append(f"Skipped {len(self.skipped)} task(s) due to time constraints:")
+            for task in self.skipped:
+                pet_name = task.pet.name if task.pet else "Unknown"
+                lines.append(
+                    f"  - {pet_name}: {task.name} ({task.duration} min) [{task.priority}]"
+                )
+
+        return "\n".join(lines)
 
     def total_planned_time(self) -> int:
         """Pure: total minutes consumed by the scheduled tasks."""
