@@ -44,6 +44,7 @@ class Task:
     # Back-reference to the owning pet; set in Pet.add_task. repr/compare off
     # to avoid recursive repr with Pet.tasks.
     pet: "Pet | None" = field(default=None, repr=False, compare=False)
+    completion_status: str = "pending"  # "pending" | "completed" | "skipped"   
 
     def priority_rank(self) -> int:
         """Numeric rank for sorting (lower = more important; unknown sorts last)."""
@@ -64,6 +65,14 @@ class Task:
         time_label = self.scheduled_time.strftime("%H:%M") if self.scheduled_time else "unscheduled"
         pet_name = self.pet.name if self.pet else "Unknown"
         return f"{time_label} - {pet_name}: {self.name} ({self.duration} min) [{self.priority}]"
+    
+    def mark_completed(self) -> None:
+        """Mark the task as completed."""
+        self.completion_status = "completed"
+
+    def mark_skipped(self) -> None:
+        """Mark the task as skipped."""
+        self.completion_status = "skipped"
 
 
 @dataclass
