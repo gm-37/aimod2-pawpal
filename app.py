@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import date
+from datetime import date, time
 
 from pawpal_system import Owner, Task, Pet, Scheduler
 
@@ -74,12 +74,27 @@ with col2:
 with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
+# Optionally pin a task to a fixed time; otherwise the scheduler places it.
+pin_time = st.checkbox("Pin to a fixed time")
+fixed_time = st.time_input("Fixed time", value=time(9, 0)) if pin_time else None
+
 if st.button("Add task"):
     st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
+        {
+            "title": task_title,
+            "duration_minutes": int(duration),
+            "priority": priority,
+            "fixed_time": fixed_time.strftime("%H:%M") if pin_time else "—",
+        }
     )
     st.session_state.pet.add_task(
-        Task(name=task_title, duration=int(duration), priority=priority)
+        Task(
+            name=task_title,
+            duration=int(duration),
+            priority=priority,
+            scheduled_time=fixed_time if pin_time else None,
+            fixed=pin_time,
+        )
     )
 
 if st.session_state.tasks:
@@ -96,3 +111,8 @@ st.caption("This button should call your scheduling logic once you implement it.
 if st.button("Generate schedule"):
     st.session_state.scheduler.generate_plan(date.today())
     st.text(str(st.session_state.scheduler))  # readable plan via Scheduler.__str__
+
+    # Warn (don't crash) if any scheduled tasks overlap in time.
+    warning = st.session_state.scheduler.conflict_warning()
+    if warning:
+        st.warning(warning)

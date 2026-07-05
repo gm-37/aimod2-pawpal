@@ -13,8 +13,14 @@ Mechanical helpers are implemented; the real scheduling logic is stubbed
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import date, time
+from dataclasses import dataclass, field, replace
+from datetime import date, time, timedelta
+
+# Days until the next occurrence, keyed by recurrence.
+RECURRENCE_DAYS = {"daily": 1, "weekly": 7}
+
+# Glyph shown at the start of a rendered task line, keyed by completion_status.
+STATUS_MARKERS = {"pending": "○", "completed": "✓", "skipped": "✗"}
 
 # Lower rank = more important. Used for sorting; avoids a separate enum class.
 PRIORITY_ORDER = {"high": 1, "medium": 2, "low": 3}
@@ -40,7 +46,9 @@ class Task:
     priority: str = "medium"  # "high" | "medium" | "low"
     category: str = "general"
     recurrence: str = "daily"  # "daily" | "weekly" | "none"
+    due_date: date | None = None  # the day this occurrence is due; None = due whenever recurrence says
     scheduled_time: time | None = None  # set by Scheduler.generate_plan()
+    fixed: bool = False  # True = scheduled_time is a pinned appointment; the scheduler honors it as-is
     # Back-reference to the owning pet; set in Pet.add_task. repr/compare off
     # to avoid recursive repr with Pet.tasks.
     pet: "Pet | None" = field(default=None, repr=False, compare=False)
@@ -51,7 +59,15 @@ class Task:
         return PRIORITY_ORDER.get(self.priority.lower(), 99)
 
     def is_due_today(self, today: date) -> bool:
-        """Whether this task should run on the given date (handles recurrence)."""
+        """Whether this task should run on the given date (handles recurrence).
+
+        When an explicit due_date is set (e.g. on an auto-spawned next
+        occurrence), the task is due once we've reached that day — this keeps
+        a freshly-spawned successor from surfacing before its date. Without a
+        due_date, fall back to the recurrence rule.
+        """
+        if self.due_date is not None:
+            return today >= self.due_date
         recurrence = self.recurrence.lower()
         if recurrence == "daily":
             return True
@@ -61,14 +77,58 @@ class Task:
         return False
 
     def format_line(self) -> str:
-        """Render one plan line, e.g. '08:00 - Biscuit: Morning walk (30 min) [high]'."""
+        """Render one plan line, e.g. '✓ 08:00 - Biscuit: Morning walk (30 min) [high]'.
+
+        A leading glyph shows completion_status (○ pending, ✓ completed,
+        ✗ skipped) so the same line reflects both the plan and its progress.
+        """
+        marker = STATUS_MARKERS.get(self.completion_status.lower(), "○")
         time_label = self.scheduled_time.strftime("%H:%M") if self.scheduled_time else "unscheduled"
         pet_name = self.pet.name if self.pet else "Unknown"
-        return f"{time_label} - {pet_name}: {self.name} ({self.duration} min) [{self.priority}]"
+        return f"{marker} {time_label} - {pet_name}: {self.name} ({self.duration} min) [{self.priority}]"
     
-    def mark_completed(self) -> None:
-        """Mark the task as completed."""
+    def mark_completed(self, today: date | None = None) -> "Task | None":
+        """Mark the task as completed.
+
+        If this is a recurring task ("daily" or "weekly"), a fresh pending
+        instance is automatically created for the next occurrence and added
+        to the same pet. Returns that new task, or None if nothing was
+        spawned (non-recurring task, or no owning pet).
+
+        `today` is the completion date used to compute the successor's
+        due_date; it defaults to date.today().
+        """
         self.completion_status = "completed"
+        return self._spawn_next_occurrence(today or date.today())
+
+    def _spawn_next_occurrence(self, today: date) -> "Task | None":
+        """Create the next occurrence of a recurring task on the same pet.
+
+        The clone copies every field but resets the per-occurrence state
+        (scheduled_time -> None, completion_status -> "pending") and stamps
+        the next due_date: daily -> +1 day, weekly -> +7 days. The next date
+        is measured from this occurrence's own due_date when it has one, so a
+        chain of completions stays anchored to the schedule rather than
+        drifting; otherwise it's measured from `today`. One-off tasks
+        ("none") and orphan tasks (no pet) spawn nothing.
+        """
+        interval = RECURRENCE_DAYS.get(self.recurrence.lower())
+        if interval is None:
+            return None
+        if self.pet is None:
+            return None
+        base = self.due_date if self.due_date is not None else today
+        next_due = base + timedelta(days=interval)
+        # pet=None here; add_task sets the back-reference on the new instance.
+        next_task = replace(
+            self,
+            due_date=next_due,
+            scheduled_time=None,
+            completion_status="pending",
+            pet=None,
+        )
+        self.pet.add_task(next_task)
+        return next_task
 
     def mark_skipped(self) -> None:
         """Mark the task as skipped."""
@@ -156,15 +216,69 @@ class Scheduler:
             key=lambda task: (task.priority_rank(), task.duration, task.name.lower()),
         )
 
+    def sort_by_time(self, tasks: list[Task] | None = None) -> list[Task]:
+        """Pure: tasks ordered chronologically by scheduled_time.
+
+        Uses a lambda key that renders each time as a zero-padded "HH:MM"
+        string — fixed-width HH:MM sorts lexicographically the same way it
+        sorts chronologically, so plain string comparison is correct.
+        Unscheduled tasks (scheduled_time is None) sort to the end via the
+        sentinel "99:99".
+
+        Defaults to the current plan when no list is passed.
+        """
+        if tasks is None:
+            tasks = self.plan
+        return sorted(
+            tasks,
+            key=lambda task: task.scheduled_time.strftime("%H:%M")
+            if task.scheduled_time
+            else "99:99",
+        )
+
+    def filter_tasks(
+        self,
+        tasks: list[Task] | None = None,
+        *,
+        completion_status: str | None = None,
+        pet_name: str | None = None,
+    ) -> list[Task]:
+        """Pure: tasks matching the given completion_status and/or pet_name.
+
+        Both filters are optional and combine with AND — pass one, both, or
+        neither. Matching is case-insensitive. Defaults to every task across
+        the owner's pets when no list is passed.
+        """
+        if tasks is None:
+            tasks = self.collect_tasks()
+
+        result = tasks
+        if completion_status is not None:
+            wanted = completion_status.lower()
+            result = [t for t in result if t.completion_status.lower() == wanted]
+        if pet_name is not None:
+            wanted = pet_name.lower()
+            result = [t for t in result if t.pet is not None and t.pet.name.lower() == wanted]
+        return result
+
     def generate_plan(self, today: date) -> list[Task]:
         """The one mutator: fit tasks into the budget, resolving overlaps as we go.
 
         Sets self.plan and self.skipped and assigns each planned task's
         scheduled_time. Returns self.plan.
+
+        Fixed tasks (task.fixed and scheduled_time set) keep their pinned
+        time as-is; every other task is (re)packed back-to-back from
+        day_start into the remaining budget. Both kinds draw from the same
+        time budget. Overlaps between a fixed slot and a packed task are not
+        resolved here — call conflict_warning() to surface them.
         """
         all_tasks = self.collect_tasks()
+        # Clear only auto-scheduled tasks; a fixed task keeps its pinned time
+        # so re-running stays stable and pinned appointments are preserved.
         for task in all_tasks:
-            task.scheduled_time = None
+            if not task.fixed:
+                task.scheduled_time = None
 
         available_minutes = self.owner.total_available_time()
         current_minutes = time_to_minutes(self.owner.day_start)
@@ -176,7 +290,14 @@ class Scheduler:
         self.plan_date = today
 
         for task in self.sort_tasks(today):
-            if task.duration <= budget:
+            if task.fixed and task.scheduled_time is not None:
+                # Honor the pinned time; still charge it against the budget.
+                if task.duration <= budget:
+                    self.plan.append(task)
+                    budget -= task.duration
+                else:
+                    self.skipped.append(task)
+            elif task.duration <= budget:
                 task.scheduled_time = minutes_to_time(current_minutes)
                 self.plan.append(task)
                 current_minutes += task.duration
@@ -184,7 +305,64 @@ class Scheduler:
             else:
                 self.skipped.append(task)
 
+        # Present the plan chronologically, since fixed slots may fall
+        # anywhere relative to the packed tasks.
+        self.plan = self.sort_by_time(self.plan)
         return self.plan
+
+    def find_conflicts(
+        self, tasks: list[Task] | None = None
+    ) -> list[tuple[Task, Task]]:
+        """Pure: pairs of scheduled tasks whose time slots overlap.
+
+        Two tasks conflict when their [start, start + duration) minute
+        intervals overlap — this covers identical start times and partial
+        overlaps alike, across the same pet or different pets. Back-to-back
+        tasks (one ends exactly as the next begins) do NOT conflict, matching
+        how generate_plan packs them. Tasks without a scheduled_time are
+        ignored. Defaults to the current plan.
+        """
+        if tasks is None:
+            tasks = self.plan
+
+        scheduled = [t for t in tasks if t.scheduled_time is not None]
+        # Sort by start so each task only needs to look ahead until a task
+        # starts at/after its end — everything past that cannot overlap.
+        scheduled.sort(key=lambda t: time_to_minutes(t.scheduled_time))
+
+        conflicts: list[tuple[Task, Task]] = []
+        for i, task_a in enumerate(scheduled):
+            start_a = time_to_minutes(task_a.scheduled_time)
+            end_a = start_a + task_a.duration
+            for task_b in scheduled[i + 1 :]:
+                start_b = time_to_minutes(task_b.scheduled_time)
+                if start_b >= end_a:
+                    break  # later tasks start even later; none can overlap
+                conflicts.append((task_a, task_b))
+        return conflicts
+
+    def conflict_warning(self, tasks: list[Task] | None = None) -> str:
+        """Pure: human-readable warning for any scheduling conflicts.
+
+        Returns an empty string when there are none, so callers can treat it
+        as falsy. This never raises on overlapping tasks — it reports them.
+        """
+        conflicts = self.find_conflicts(tasks)
+        if not conflicts:
+            return ""
+
+        def slot(task: Task) -> str:
+            pet_name = task.pet.name if task.pet else "Unknown"
+            start = task.scheduled_time.strftime("%H:%M")
+            end = minutes_to_time(
+                time_to_minutes(task.scheduled_time) + task.duration
+            ).strftime("%H:%M")
+            return f"{pet_name}: {task.name} ({start}–{end})"
+
+        lines = [f"⚠ {len(conflicts)} scheduling conflict(s) detected:"]
+        for task_a, task_b in conflicts:
+            lines.append(f"  - {slot(task_a)} overlaps {slot(task_b)}")
+        return "\n".join(lines)
 
     def explain(self) -> str:
         """Pure: human-readable reasoning for the current plan."""
@@ -234,6 +412,12 @@ class Scheduler:
             lines.append("  Skipped (ran out of time):")
             for task in self.skipped:
                 lines.append(f"    - {task.name} ({task.duration} min)")
+
+        warning = self.conflict_warning()
+        if warning:
+            lines.append("")
+            for warning_line in warning.splitlines():
+                lines.append(f"  {warning_line}")
 
         lines.append("-" * 44)
         lines.append(

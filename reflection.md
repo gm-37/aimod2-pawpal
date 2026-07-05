@@ -39,10 +39,16 @@ Yes. Claude brought up a good point in that the scheduler could not easily adjus
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
+The scheduler considers priority and time above all. Especially if the time of a task is scheduled by the user, it honors that above all and prints a warning if there's a collision with another task, and it will rearrange flexible tasks around the ones with an assigned time. Priority is used when the scheduler is arranging the flexible ones and deciding which ones can be skipped. 
+
+Time should matter the most because those are the tasks the user scheduled themselves so they should be honored. After that is priority as more important tasks should take precedence over less important ones. Like feeding a pet should be more important to be scheduled than taking a pet to the dog park for fun.
+
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+
+One tradeoff the scheduler makes is that owner preferences are stored but not used in competition with priority. Also priority for one task is put above lesser priority but more tasks (e.g. a 90 minute task with high priority is put above 3 30-minute tasks with medium priority) even if the 30-minute tasks may provide more "care" than the one long one. It's reasonable as the schedule generator isn't as advanced so it can't reason which are most important, so the higher priority automatically takes precedence and this is uniform no matter what tasks.
 
 ---
 
