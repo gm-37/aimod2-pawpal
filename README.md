@@ -63,13 +63,26 @@ pytest
 
 # Run with coverage:
 pytest --cov
+
 ```
+
+The test suite covers sorting correctness and recurrence logic of the scheduler behaviors as well as checks conflict detection and ensures adding tasks and removing tasks and pet logic occurs as it should. All 16 tests have passed.
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+
+platform darwin -- Python 3.13.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/kirmak/Desktop/CodePath/AI110/aimod2-pawpal
+plugins: anyio-4.14.0
+collected 16 items                                                                                        
+
+tests/test_pawpal.py ...........                                                                    [100%]
+
+=========================================== 16 passed in 0.02s ============================================
 ```
+Confidence level: 4 out of 5 stars
+
 
 ## 📐 Smarter Scheduling
 
@@ -77,19 +90,25 @@ Sample test output:
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | Scheduler.sort_by_time(), Scheduler.sort_tasks() | e.g., by priority, duration |
+| Filtering | Scheduler.filter_tasks() | e.g., skip tasks if time runs out |
+| Conflict handling | Scheduler.find_conflicts(), Scheduler.conflict_warning() | e.g., overlapping time slots |
+| Recurring tasks | Task.mark_completed  | e.g., daily vs. weekly |
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+Follow along without watching a video:
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+1. **Enter owner + pet info.** Type an owner name and pet name, and pick a species. These feed straight into the `Owner` and `Pet` objects held in session state.
+2. **Add care tasks.** For each task, set a title, duration (minutes), and priority (low / medium / high). Optionally check **Pin to a fixed time** to lock a task to a set time (e.g. a 9:00 vet appointment); otherwise the scheduler places it for you. Added tasks appear in the "Current tasks" table.
+3. **Generate the schedule.** Click **Generate schedule**. The `Scheduler` keeps today's due tasks, sorts them by priority (then shortest duration), and packs them back-to-back from the start of the day into the available time budget. Pinned tasks keep their time.
+4. **Review conflict warnings.** If any tasks overlap in time, the app flags each overlapping pair and suggests moving the lower-priority task. If everything has its own slot, you get a "No scheduling conflicts" confirmation.
+5. **Read the plan and filter it.** The plan is shown chronologically as a table (time, pet, task, duration, priority, status). Use the **Filter by pet** and **Filter by status** dropdowns to narrow it down.
+6. **Check skipped tasks.** Any task that didn't fit the day's time budget is listed under a "didn't fit" warning so nothing silently disappears. Open **Full text plan** for a plain-text summary you can copy.
+
+**Example workflow**
+add a pet-->schedule task-->view today's schedule
+
+(View sample output above)
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->

@@ -8,6 +8,9 @@ classDiagram
         +time day_start
         +time day_end
         +dict preferences
+        +list~Pet~ pets
+        +add_pet(pet) None
+        +remove_pet(pet) None
         +total_available_time() int
         +add_preference(key, value) None
     }
@@ -29,26 +32,38 @@ classDiagram
         +str priority
         +str category
         +str recurrence
+        +date due_date
         +time scheduled_time
+        +bool fixed
+        +Pet pet
+        +str completion_status
         +priority_rank() int
         +is_due_today(date) bool
-        +__repr__() str
+        +format_line() str
+        +mark_completed(today) Task
+        +mark_skipped() None
+        -_spawn_next_occurrence(today) Task
     }
 
     class Scheduler {
         +Owner owner
-        +Pet pet
         +list~Task~ plan
         +list~Task~ skipped
-        +sort_tasks() list~Task~
-        +generate_plan() list~Task~
-        +resolve_conflicts() None
+        +date plan_date
+        +collect_tasks() list~Task~
+        +sort_tasks(today) list~Task~
+        +sort_by_time(tasks) list~Task~
+        +filter_tasks(tasks) list~Task~
+        +generate_plan(today) list~Task~
+        +find_conflicts(tasks) list~tuple~
+        +conflict_warning(tasks) str
         +explain() str
         +total_planned_time() int
+        +__str__() str
     }
 
     Owner "1" --> "*" Pet : owns
-    Pet "1" --> "*" Task : has
+    Pet "1" o-- "*" Task : has
+    Task "*" --> "1" Pet : belongs to
     Scheduler --> Owner : uses
-    Scheduler --> Pet : plans for
     Scheduler ..> Task : schedules

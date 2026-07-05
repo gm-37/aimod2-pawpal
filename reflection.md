@@ -59,10 +59,14 @@ One tradeoff the scheduler makes is that owner preferences are stored but not us
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
 
+I used Claude to help with brainstorming and refactoring mostly. I asked it for feedback on how to simplify certain aspects (like sorting/conflict algorithms) and sometimes ideas on how to implement methods I wasn't sure about, like generate schedule. Just asking it for feedback was the most helpful.
+
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
+
+I did not accept an AI suggestion to completely change app.py's beginning set-up to implement a multiple pets feature because I didn't understand a lot of the code there (even after asking for clarification) and I was scared of it breaking something important. I thought it was better to leave it then cause unintended consequences.
 
 ---
 
@@ -73,10 +77,14 @@ One tradeoff the scheduler makes is that owner preferences are stored but not us
 - What behaviors did you test?
 - Why were these tests important?
 
+I tested main behaviors like adding a pet, setting tasks at fixed and unfixed times, sorting, conflict warnings, recurring tasks, and more. These behaviors make up the core of the app so it's important they are tested to make sure they work correctly and don't break the app, which could be costly in a real-life situation.
+
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
 - What edge cases would you test next if you had more time?
+
+I am 4/5 confident the scheduler works correctly. I would test edge cases on skipping tasks with high priority and play around more with differing times and priorities. if I had more time.
 
 ---
 
@@ -84,12 +92,16 @@ One tradeoff the scheduler makes is that owner preferences are stored but not us
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I'm most satisfied with the generating schedule part because I never thought I'd be able to implement that and I did and it works somehow?? I find that the most surprising!
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+I would definitely figure out how to add more pets for an owner and test that next if I had more time to the UI. The backend supports this feature, but the UI part confused me and I didn't want to do major overhaul and break something. I'd also take owner preferences into account more.
 
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+
+I learned how to better communicate my ideas with Claude and use it to better my coding. This class is the first time I've used an agent to assist with my programming and I've learned a lot about what to trust and not trust and how to evaluate the ideas it provides.
+
+Using different chat sessions was also helpful in separating different phases in the development and different tasks!
